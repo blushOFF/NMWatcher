@@ -58,15 +58,41 @@ def months_to_check(dates):
     return sorted({(int(d[:4]), int(d[5:7])) for d in dates})
 
 
+SESSION = cffi_requests.Session(impersonate="chrome")
+HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "X-Requested-With": "XMLHttpRequest",
+    "Referer": BOOKING_URL,
+    "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+}
+_warmed_up = False
+
+
 def fetch_month(year, month):
-    r = cffi_requests.get(
+    global _warmed_up
+    if not _warmed_up:
+        # Ouvre d'abord la page calendrier comme un navigateur (cookies).
+        SESSION.get(BOOKING_URL, timeout=30)
+        _warmed_up = True
+    r = SESSION.get(
         API_URL,
         params={"target_year": year, "target_month": month},
-        impersonate="chrome",
-        timeout=20,
+        headers=HEADERS,
+        timeout=30,
     )
-    r.raise_for_status()
-    return r.json()["data"]["calendar"]
+    if r.status_code != 200:
+        _reset()
+        raise RuntimeError(f"HTTP {r.status_code} : {r.text[:200]!r}")
+    try:
+        return r.json()["data"]["calendar"]
+    except Exception:
+        _reset()
+        raise RuntimeError(f"Reponse pas en JSON : {r.text[:200]!r}")
+
+
+def _reset():
+    global _warmed_up
+    _warmed_up = False
 
 
 def available_dates(calendars, dates):
@@ -111,6 +137,8 @@ def main():
                 calendars.update(fetch_month(y, m))
             errors, error_alert_sent = 0, False
 
+            etats = " ".join(
+                f"{d[5:]}={calendars.get(d, {}).get('sale_status', '?')}" for d in dates)
             found = available_dates(calendars, dates)
             new = [d for d in found if d not in already_notified]
             if new:
@@ -119,7 +147,8 @@ def main():
                        f"Place(s) libre(s) : {jours}. Fonce, ca part en quelques minutes !")
                 log(f"DISPO : {jours}")
             else:
-                log("Rien de libre." if not found else "Toujours dispo (deja notifie).")
+                log(("Rien de libre." if not found else "Toujours dispo (deja notifie).")
+                    + f"  [{etats}]  (1=dispo, 2=complet)")
             # Si une date repart en complet, on pourra re-notifier si elle revient.
             already_notified = set(found)
 
