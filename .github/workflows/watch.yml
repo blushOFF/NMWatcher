@@ -9,9 +9,13 @@ on:
         description: "Envoyer juste une notif de test"
         type: boolean
         default: false
+      dates:
+        description: "Dates a tester (ex: 2026-11-20), vide = ton voyage"
+        type: string
+        default: ""
 
 concurrency:
-  group: watcher
+  group: watcher-${{ inputs.dates != '' && 'essai' || 'main' }}
   cancel-in-progress: false
 
 jobs:
@@ -28,3 +32,5 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TEST_NOTIFICATION: ${{ inputs.test || 'false' }}
+          TARGET_DATES: ${{ inputs.dates != '' && inputs.dates || '2026-10-14,2026-10-15,2026-10-16,2026-10-17,2026-10-18' }}
+          RUN_FOR_MINUTES: ${{ inputs.dates != '' && '3' || '55' }}
