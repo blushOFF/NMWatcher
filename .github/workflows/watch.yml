@@ -2,7 +2,7 @@ name: Nintendo Museum watcher
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
     inputs:
       test:
@@ -17,6 +17,10 @@ on:
 concurrency:
   group: watcher-${{ inputs.dates != '' && 'essai' || 'main' }}
   cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
 
 jobs:
   watch:
@@ -34,3 +38,11 @@ jobs:
           TEST_NOTIFICATION: ${{ inputs.test || 'false' }}
           TARGET_DATES: ${{ inputs.dates != '' && inputs.dates || '2026-10-14,2026-10-15,2026-10-16,2026-10-17,2026-10-18' }}
           RUN_FOR_MINUTES: ${{ inputs.dates != '' && '3' || '55' }}
+      - name: Relance en chaine
+        if: ${{ inputs.dates == '' && inputs.test != true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(date -u +%Y%m%d)" -le 20261018 ]; then
+            gh workflow run watch.yml --ref main -R "${{ github.repository }}"
+          fi
