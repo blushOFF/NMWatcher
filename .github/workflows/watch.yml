@@ -1,0 +1,30 @@
+name: Nintendo Museum watcher
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Envoyer juste une notif de test"
+        type: boolean
+        default: false
+
+concurrency:
+  group: watcher
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python check.py
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TEST_NOTIFICATION: ${{ inputs.test || 'false' }}
